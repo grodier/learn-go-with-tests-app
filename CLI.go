@@ -34,7 +34,6 @@ func (c *CLI) scheduleBlindAlerts() {
 		c.alerter.ScheduleAlertAt(blindTime, blind)
 		blindTime = blindTime + 10*time.Minute
 	}
-	c.alerter.ScheduleAlertAt(5*time.Second, 100)
 }
 
 func extractWinner(userInput string) string {
