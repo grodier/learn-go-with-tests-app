@@ -12,6 +12,11 @@ import (
 
 const jsonContentType = "application/json"
 
+var wsUpgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+}
+
 type PlayerStore interface {
 	GetPlayerScore(name string) int
 	RecordWin(name string)
@@ -71,11 +76,7 @@ func (p *PlayerServer) game(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *PlayerServer) webSocket(w http.ResponseWriter, r *http.Request) {
-	upgrader := websocket.Upgrader{
-		ReadBufferSize:  1024,
-		WriteBufferSize: 1024,
-	}
-	conn, _ := upgrader.Upgrade(w, r, nil)
+	conn, _ := wsUpgrader.Upgrade(w, r, nil)
 	_, winnerMsg, _ := conn.ReadMessage()
 	p.store.RecordWin(string(winnerMsg))
 }
