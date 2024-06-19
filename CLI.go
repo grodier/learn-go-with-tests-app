@@ -31,6 +31,7 @@ func (c *CLI) PlayPoker() {
 	numberOfPlayers, err := strconv.Atoi(strings.Trim(numberOfPlayersInput, "\n"))
 
 	if err != nil {
+		fmt.Fprint(c.out, "you're so silly")
 		return
 	}
 
