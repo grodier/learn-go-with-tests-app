@@ -16,11 +16,13 @@ var dummyStdOut = &bytes.Buffer{}
 var dummySpyAlerter = &poker.SpyBlindAlerter{}
 
 type GameSpy struct {
+	StartCalled  bool
 	StartedWith  int
 	FinishedWith string
 }
 
 func (g *GameSpy) Start(numberOfPlayers int) {
+	g.StartCalled = true
 	g.StartedWith = numberOfPlayers
 }
 
@@ -71,6 +73,19 @@ func TestCLI(t *testing.T) {
 
 		if game.FinishedWith != "Cleo" {
 			t.Errorf("expected Finish called with 'Cleo' but got %q", game.FinishedWith)
+		}
+	})
+
+	t.Run("it prints an error when a non numeric value is entered and does not start the game", func(t *testing.T) {
+		stdout := &bytes.Buffer{}
+		in := strings.NewReader("Pies\n")
+		game := &GameSpy{}
+
+		cli := poker.NewCLI(in, stdout, game)
+		cli.PlayPoker()
+
+		if game.StartCalled {
+			t.Errorf("game should not have started")
 		}
 	})
 }
