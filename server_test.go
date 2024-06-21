@@ -126,21 +126,22 @@ func TestGame(t *testing.T) {
 		defer server.Close()
 
 		wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
-
-		ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
-		if err != nil {
-			t.Fatalf("could not open a ws connection on %s %v", wsURL, err)
-
-		}
+		ws := mustDialWs(t, wsURL)
 		defer ws.Close()
 
-		if err := ws.WriteMessage(websocket.TextMessage, []byte(winner)); err != nil {
-			t.Fatalf("could not send message over ws connection %v", err)
-		}
+		writeWsMessage(t, ws, winner)
 
 		time.Sleep(10 * time.Millisecond)
 		AssertPlayerWin(t, store, winner)
 	})
+}
+
+func mustDialWs(t *testing.T, url string) *websocket.Conn {
+	ws, _, err := websocket.DefaultDialer.Dial(url, nil)
+	if err != nil {
+		t.Fatalf("could not open a ws connection on %s %v", url, err)
+	}
+	return ws
 }
 
 func getLeagueFromResponse(t testing.TB, body io.Reader) (league []Player) {
@@ -205,5 +206,13 @@ func assertStatus(t testing.TB, got *httptest.ResponseRecorder, want int) {
 
 	if got.Code != want {
 		t.Errorf("did not get correct status, got %d, want %d", got.Code, want)
+	}
+}
+
+func writeWsMessage(t testing.TB, conn *websocket.Conn, message string) {
+	t.Helper()
+
+	if err := conn.WriteMessage(websocket.TextMessage, []byte(message)); err != nil {
+		t.Fatalf("could not send message over ws connection %v", err)
 	}
 }
