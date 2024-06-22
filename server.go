@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -53,12 +52,22 @@ func newPlayerServerWs(w http.ResponseWriter, r *http.Request) *playerServerWs {
 	return &playerServerWs{conn}
 }
 
-func (p *playerServerWs) WaitForMsg() string {
-	_, msg, err := p.ReadMessage()
+func (w *playerServerWs) WaitForMsg() string {
+	_, msg, err := w.ReadMessage()
 	if err != nil {
 		log.Printf("error reading from websocket %v\n", err)
 	}
 	return string(msg)
+}
+
+func (w *playerServerWs) Write(p []byte) (n int, err error) {
+	err = w.WriteMessage(websocket.TextMessage, p)
+
+	if err != nil {
+		return 0, err
+	}
+
+	return len(p), nil
 }
 
 func NewPlayerServer(store PlayerStore, game Game) (*PlayerServer, error) {
@@ -110,7 +119,7 @@ func (p *PlayerServer) webSocket(w http.ResponseWriter, r *http.Request) {
 
 	numberOfPlayersMsg := ws.WaitForMsg()
 	numberOfPlayers, _ := strconv.Atoi(string(numberOfPlayersMsg))
-	p.game.Start(numberOfPlayers, io.Discard) //todo: don't discard the blind messages
+	p.game.Start(numberOfPlayers, ws) //todo: don't discard the blind messages
 
 	winner := ws.WaitForMsg()
 	p.game.Finish(string(winner))
