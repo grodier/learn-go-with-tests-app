@@ -14,8 +14,10 @@ import (
 	poker "github.com/grodier/learn-go-with-tests-app"
 )
 
-func mustMakePlayerServer(t *testing.T, store poker.PlayerStore) *poker.PlayerServer {
-	server, err := poker.NewPlayerServer(store)
+var dummyGame = &GameSpy{}
+
+func mustMakePlayerServer(t *testing.T, store poker.PlayerStore, game poker.Game) *poker.PlayerServer {
+	server, err := poker.NewPlayerServer(store, game)
 	if err != nil {
 		t.Fatal("problem creating player server", err)
 	}
@@ -29,7 +31,7 @@ func TestGETPlayers(t *testing.T) {
 			"Floyd":  10,
 		},
 	}
-	server := mustMakePlayerServer(t, &store)
+	server := mustMakePlayerServer(t, &store, dummyGame)
 
 	t.Run("returns Pepper's score", func(t *testing.T) {
 		request := newGetScoreRequest("Pepper")
@@ -67,7 +69,7 @@ func TestStoreWins(t *testing.T) {
 		nil,
 		nil,
 	}
-	server := mustMakePlayerServer(t, &store)
+	server := mustMakePlayerServer(t, &store, dummyGame)
 
 	t.Run("it records wins on POST", func(t *testing.T) {
 		player := "Pepper"
@@ -92,7 +94,7 @@ func TestLeague(t *testing.T) {
 		}
 
 		store := poker.StubPlayerStore{nil, nil, wantedLeague}
-		server := mustMakePlayerServer(t, &store)
+		server := mustMakePlayerServer(t, &store, dummyGame)
 
 		request := newLeagueRequest()
 		response := httptest.NewRecorder()
@@ -108,7 +110,7 @@ func TestLeague(t *testing.T) {
 
 func TestGame(t *testing.T) {
 	t.Run("GET /game returns 200", func(t *testing.T) {
-		server := mustMakePlayerServer(t, &poker.StubPlayerStore{})
+		server := mustMakePlayerServer(t, &poker.StubPlayerStore{}, dummyGame)
 
 		request := newGameRequest()
 		response := httptest.NewRecorder()
@@ -118,20 +120,22 @@ func TestGame(t *testing.T) {
 		assertStatus(t, response, http.StatusOK)
 	})
 
-	t.Run("when we get a message over websocket it is a winner of a game", func(t *testing.T) {
-		store := &poker.StubPlayerStore{}
+	t.Run("start a game with 3 players and declare Ruth the winner", func(t *testing.T) {
+		game := &GameSpy{}
 		winner := "Ruth"
-		server := httptest.NewServer(mustMakePlayerServer(t, store))
+		server := httptest.NewServer(mustMakePlayerServer(t, dummyPlayerStore, game))
 		defer server.Close()
 
 		wsURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/ws"
 		ws := mustDialWs(t, wsURL)
 		defer ws.Close()
 
+		writeWsMessage(t, ws, "3")
 		writeWsMessage(t, ws, winner)
 
 		time.Sleep(10 * time.Millisecond)
-		poker.AssertPlayerWin(t, store, winner)
+		assertGameStartedWith(t, game, 3)
+		assertFinishCalledWith(t, game, winner)
 	})
 }
 

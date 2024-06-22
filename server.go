@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gorilla/websocket"
@@ -33,9 +35,10 @@ type PlayerServer struct {
 	store PlayerStore
 	http.Handler
 	template *template.Template
+	game     Game
 }
 
-func NewPlayerServer(store PlayerStore) (*PlayerServer, error) {
+func NewPlayerServer(store PlayerStore, game Game) (*PlayerServer, error) {
 	p := new(PlayerServer)
 
 	tmpl, err := template.ParseFiles(htmlTemplatePath)
@@ -44,13 +47,14 @@ func NewPlayerServer(store PlayerStore) (*PlayerServer, error) {
 		return nil, fmt.Errorf("problem loading template %s %v", htmlTemplatePath, err)
 	}
 
+	p.game = game
 	p.template = tmpl
 	p.store = store
 
 	router := http.NewServeMux()
 	router.Handle("/league", http.HandlerFunc(p.leagueHandler))
 	router.Handle("/players/", http.HandlerFunc(p.playersHandler))
-	router.Handle("/game", http.HandlerFunc(p.game))
+	router.Handle("/game", http.HandlerFunc(p.playGame))
 	router.Handle("/ws", http.HandlerFunc(p.webSocket))
 
 	p.Handler = router
@@ -74,14 +78,19 @@ func (p *PlayerServer) playersHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (p *PlayerServer) game(w http.ResponseWriter, r *http.Request) {
+func (p *PlayerServer) playGame(w http.ResponseWriter, r *http.Request) {
 	p.template.Execute(w, nil)
 }
 
 func (p *PlayerServer) webSocket(w http.ResponseWriter, r *http.Request) {
 	conn, _ := wsUpgrader.Upgrade(w, r, nil)
+
+	_, numberOfPlayersMsg, _ := conn.ReadMessage()
+	numberOfPlayers, _ := strconv.Atoi(string(numberOfPlayersMsg))
+	p.game.Start(numberOfPlayers, io.Discard) //todo: don't discard the blind messages
+
 	_, winnerMsg, _ := conn.ReadMessage()
-	p.store.RecordWin(string(winnerMsg))
+	p.game.Finish(string(winnerMsg))
 }
 
 func (p *PlayerServer) showScore(w http.ResponseWriter, player string) {
