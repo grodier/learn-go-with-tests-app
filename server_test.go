@@ -138,8 +138,6 @@ func TestGame(t *testing.T) {
 		writeWsMessage(t, ws, "3")
 		writeWsMessage(t, ws, winner)
 
-		time.Sleep(tenMs)
-
 		assertGameStartedWith(t, game, 3)
 		assertFinishCalledWith(t, game, winner)
 		within(t, tenMs, func() { assertWebSocketGotMessage(t, ws, wantedBlindAlert) })
@@ -249,4 +247,14 @@ func writeWsMessage(t testing.TB, conn *websocket.Conn, message string) {
 	if err := conn.WriteMessage(websocket.TextMessage, []byte(message)); err != nil {
 		t.Fatalf("could not send message over ws connection %v", err)
 	}
+}
+
+func retryUntil(d time.Duration, f func() bool) bool {
+	deadline := time.Now().Add(d)
+	for time.Now().Before(deadline) {
+		if f() {
+			return true
+		}
+	}
+	return false
 }

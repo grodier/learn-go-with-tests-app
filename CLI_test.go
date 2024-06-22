@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	poker "github.com/grodier/learn-go-with-tests-app"
 )
@@ -94,8 +95,13 @@ func TestCLI(t *testing.T) {
 
 func assertGameStartedWith(t testing.TB, game *GameSpy, numberOfPlayersWanted int) {
 	t.Helper()
-	if game.StartCalledWith != numberOfPlayersWanted {
-		t.Errorf("wanted Start called with %d, but got %d", numberOfPlayersWanted, game.StartCalledWith)
+
+	passed := retryUntil(500*time.Millisecond, func() bool {
+		return game.StartCalledWith == numberOfPlayersWanted
+	})
+
+	if !passed {
+		t.Errorf("wanted Start called with %d but got %d", numberOfPlayersWanted, game.StartCalledWith)
 	}
 }
 
@@ -115,7 +121,12 @@ func assertGameNotStarted(t testing.TB, game *GameSpy) {
 
 func assertFinishCalledWith(t testing.TB, game *GameSpy, winner string) {
 	t.Helper()
-	if game.FinishCalledWith != winner {
+
+	passed := retryUntil(500*time.Millisecond, func() bool {
+		return game.FinishCalledWith == winner
+	})
+
+	if !passed {
 		t.Errorf("expected Finish called with %q, but got %q", winner, game.FinishCalledWith)
 	}
 }
