@@ -14,7 +14,10 @@ import (
 	poker "github.com/grodier/learn-go-with-tests-app"
 )
 
-var dummyGame = &GameSpy{}
+var (
+	dummyGame = &GameSpy{}
+	tenMs     = 10 * time.Millisecond
+)
 
 func mustMakePlayerServer(t *testing.T, store poker.PlayerStore, game poker.Game) *poker.PlayerServer {
 	server, err := poker.NewPlayerServer(store, game)
@@ -121,8 +124,10 @@ func TestGame(t *testing.T) {
 	})
 
 	t.Run("start a game with 3 players and declare Ruth the winner", func(t *testing.T) {
-		game := &GameSpy{}
+		wantedBlindAlert := "Blind is 100"
 		winner := "Ruth"
+
+		game := &GameSpy{BlindAlert: []byte(wantedBlindAlert)}
 		server := httptest.NewServer(mustMakePlayerServer(t, dummyPlayerStore, game))
 		defer server.Close()
 
@@ -133,9 +138,11 @@ func TestGame(t *testing.T) {
 		writeWsMessage(t, ws, "3")
 		writeWsMessage(t, ws, winner)
 
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(tenMs)
+
 		assertGameStartedWith(t, game, 3)
 		assertFinishCalledWith(t, game, winner)
+		within(t, tenMs, func() { assertWebSocketGotMessage(t, ws, wantedBlindAlert) })
 	})
 }
 
@@ -145,6 +152,23 @@ func mustDialWs(t *testing.T, url string) *websocket.Conn {
 		t.Fatalf("could not open a ws connection on %s %v", url, err)
 	}
 	return ws
+}
+
+func within(t testing.TB, d time.Duration, assert func()) {
+	t.Helper()
+
+	done := make(chan struct{}, 1)
+
+	go func() {
+		assert()
+		done <- struct{}{}
+	}()
+
+	select {
+	case <-time.After(d):
+		t.Error("timed out")
+	case <-done:
+	}
 }
 
 func getLeagueFromResponse(t testing.TB, body io.Reader) (league []poker.Player) {
@@ -209,6 +233,13 @@ func assertStatus(t testing.TB, got *httptest.ResponseRecorder, want int) {
 
 	if got.Code != want {
 		t.Errorf("did not get correct status, got %d, want %d", got.Code, want)
+	}
+}
+
+func assertWebSocketGotMessage(t *testing.T, ws *websocket.Conn, want string) {
+	_, msg, _ := ws.ReadMessage()
+	if string(msg) != want {
+		t.Errorf(`got "%s", want "%s"`, string(msg), want)
 	}
 }
 
